@@ -1,13 +1,14 @@
 import axios from "axios";
 import { getAccessToken } from "../state/tokenStorage";
 
-const baseURL = import.meta.env.VITE_API_URL as string | undefined;
+// Default to localhost:3000/api for development if not set
+// Note: The API has a global prefix '/api' set in main.ts
+const apiBaseURL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const baseURL = apiBaseURL.endsWith('/api') ? apiBaseURL : `${apiBaseURL}/api`;
 
-if (!baseURL) {
-  // In production you might want to fail fast; for now we log to help local dev.
-  // eslint-disable-next-line no-console
-  console.warn("VITE_API_URL is not set. API calls will likely fail.");
-}
+// Log the base URL for debugging
+console.log('🔗 API Base URL:', baseURL);
+console.log('🔗 VITE_API_URL env:', import.meta.env.VITE_API_URL);
 
 export const api = axios.create({
   baseURL,

@@ -19,6 +19,7 @@ const LoginPage: React.FC = () => {
       setSubmitting(true);
       await login(email, password, remember);
     } catch (err: any) {
+      console.log('err******************************************************************************', err);
       add({
         title: "Login failed",
         description: err?.response?.data?.message ?? "Please check credentials",

@@ -13,7 +13,7 @@ export const AppDataSource = new DataSource({
   database: process.env.DB_NAME || 'cine_stories',
   entities: ['src/infrastructure/database/entities/*.entity.ts'],
   migrations: ['src/migrations/*.ts'],
-  synchronize: true,
+  synchronize: true, // Auto-sync schema (creates missing columns)
   logging: false,
 });
 

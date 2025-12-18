@@ -58,6 +58,7 @@ services:
       NODE_OPTIONS: "--max-old-space-size=4096"
       VITE_DISABLE_OPTIMIZE_DEPS: "false"
       VITE_HMR_PORT: "5173"
+      VITE_API_URL: ${VITE_API_URL:-http://localhost:3000/api}
     ports:
       - "5173:5173"
     mem_limit: 6g

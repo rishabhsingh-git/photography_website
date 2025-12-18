@@ -15,7 +15,9 @@
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "migration:run": "ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js migration:run -d src/data-source.ts",
     "migration:generate": "ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js migration:generate -d src/data-source.ts",
-    "seed:admin": "ts-node -r tsconfig-paths/register src/seeds/seed-admin.ts"
+    "seed:admin": "ts-node -r tsconfig-paths/register src/seeds/seed-admin.ts",
+    "seed:admin:docker": "docker-compose exec api npm run seed:admin",
+    "fix:roles": "ts-node -r tsconfig-paths/register src/scripts/fix-roles-null.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.676.0",

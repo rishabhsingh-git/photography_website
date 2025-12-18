@@ -14,13 +14,19 @@ export class AuthService {
   ) {}
 
   async validateUser(email: string, password: string) {
+    console.log('email******************************************************************************', email);
+    console.log('password******************************************************************************', password);
+   const users = await this.users.find();
+   console.log('users******************************************************************************', users);
     const user = await this.users.findOne({
       where: { email },
       select: ['id', 'email', 'passwordHash'],
     });
+    console.log('user******************************************************************************', user);
     if (!user?.passwordHash) throw new UnauthorizedException('User not found or no password set');
     const ok = await argon2.verify(user.passwordHash, password);
     if (!ok) throw new UnauthorizedException('Invalid credentials');
+    console.log('ok******************************************************************************', ok);
     return user;
   }
 
