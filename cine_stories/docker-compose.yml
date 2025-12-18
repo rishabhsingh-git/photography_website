@@ -1,0 +1,118 @@
+# Development Docker Compose Configuration
+# Usage: docker-compose --env-file .env.development up
+# Or: docker-compose up (uses defaults if no env file)
+
+services:
+  api:
+    build: .
+    command: sh -c "if [ ! -d node_modules ]; then yarn install --frozen-lockfile; fi && node node_modules/@nestjs/cli/bin/nest.js start --watch"
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      NODE_OPTIONS: ${NODE_OPTIONS:---max-old-space-size=2048}
+      DATABASE_URL: ${DATABASE_URL:-postgres://cine_stories:cine_stories@db:5432/cine_stories}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      S3_ENDPOINT: ${S3_ENDPOINT:-http://minio:9000}
+      S3_REGION: ${S3_REGION:-us-east-1}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-minio}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-miniosecret}
+      S3_BUCKET: ${S3_BUCKET:-photo-bucket}
+      S3_PUBLIC_URL: ${S3_PUBLIC_URL:-http://localhost:9000}
+      JWT_SECRET: ${JWT_SECRET:-dev-secret}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-dev-refresh-secret}
+      SESSION_SECRET: ${SESSION_SECRET:-dev-session}
+      RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID:-rzp_test_RsdUUzzuMRnrmK}
+      RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET:-VvwcytJsdkH1Cz2tDWr19TgH}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-your-google-client-id}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-your-google-client-secret}
+      GOOGLE_CALLBACK_URL: ${GOOGLE_CALLBACK_URL:-http://localhost:3000/auth/google/callback}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
+      CHOKIDAR_USEPOLLING: ${CHOKIDAR_USEPOLLING:-true}
+      CHOKIDAR_INTERVAL: ${CHOKIDAR_INTERVAL:-500}
+      WATCHPACK_POLLING: ${WATCHPACK_POLLING:-true}
+    ports:
+      - '3000:3000'
+    depends_on:
+      - db
+      - redis
+      - minio
+      - rabbitmq
+    volumes:
+      - ./:/usr/src/app
+      - /usr/src/app/node_modules
+    mem_limit: 2.5g
+    memswap_limit: 2.5g
+
+  # Default baked client (avoids host bind mounts to prevent EIO)
+  client:
+    build:
+      context: ../apps/client
+      dockerfile: Dockerfile
+    working_dir: /usr/src/app
+    command: sh -c "npm install @rollup/rollup-linux-x64-musl --save-optional --no-audit || true && npm run dev"
+    environment:
+      CHOKIDAR_USEPOLLING: "true"
+      CHOKIDAR_INTERVAL: "1000"
+      WATCHPACK_POLLING: "true"
+      NODE_OPTIONS: "--max-old-space-size=4096"
+      VITE_DISABLE_OPTIMIZE_DEPS: "false"
+      VITE_HMR_PORT: "5173"
+    ports:
+      - "5173:5173"
+    mem_limit: 6g
+    memswap_limit: 6g
+    healthcheck:
+      test: ["CMD-SHELL", "node -e 'console.log(\"ok\")' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Dev client with host bind mounts (may trigger EIO on Windows
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-cine_stories}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cine_stories}
+      POSTGRES_DB: ${POSTGRES_DB:-cine_stories}
+    ports:
+      - '5432:5432'
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - '6379:6379'
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - '5672:5672'
+      - '15672:15672'
+    mem_limit: 2g
+    memswap_limit: 2g
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+      - ./rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+    healthcheck:
+      test: ["CMD-SHELL", "rabbitmq-diagnostics -q status"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  minio:
+    image: minio/minio:RELEASE.2024-04-18T19-09-19Z
+    command: server /data
+    environment:
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minio}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-miniosecret}
+    volumes:
+      - minio-data:/data
+    ports:
+      - '9000:9000'
+      - '9001:9001'
+  
+volumes:
+  minio-data: {}
+  client_node_modules: {}
+  rabbitmq-data: {}

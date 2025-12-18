@@ -1,0 +1,25 @@
+{
+  "name": "photo-platform",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Monorepo for photography platform (api, web, admin)",
+  "workspaces": [
+    "photo-backend",
+    "apps/web",
+    "apps/admin",
+    "apps/client"
+  ],
+  "scripts": {
+    "dev:web": "yarn workspace web dev",
+    "dev:admin": "yarn workspace admin dev",
+    "dev:client": "yarn workspace client dev",
+    "dev:api": "yarn workspace photo-backend start:dev",
+    "build": "yarn workspaces run build",
+    "lint": "yarn workspaces run lint",
+    "test": "yarn workspaces run test"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.2"
+  }
+}
+
