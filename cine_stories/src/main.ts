@@ -2,7 +2,8 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
-import { json, urlencoded } from 'express';
+import cookieParser from 'cookie-parser';
+import { json, urlencoded, Request, Response, NextFunction } from 'express';
 import { Logger } from 'nestjs-pino';
 
 import { AppModule } from './app.module';
@@ -23,6 +24,7 @@ async function bootstrap() {
     allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
     exposedHeaders: ['Content-Disposition'],
   });
+  app.use(cookieParser());
   app.use(
     rateLimit({
       windowMs: 15 * 60 * 1000,
@@ -31,6 +33,25 @@ async function bootstrap() {
   );
   app.use(json({ limit: '10mb' }));
   app.use(urlencoded({ extended: true, limit: '10mb' }));
+  
+  // Log all incoming requests for debugging
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    if (req.path.includes('/services')) {
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('🌐 [Middleware] Incoming request to services endpoint');
+      console.log('🌐 [Middleware] Method:', req.method);
+      console.log('🌐 [Middleware] Path:', req.path);
+      console.log('🌐 [Middleware] Full URL:', req.url);
+      console.log('🌐 [Middleware] Headers:', {
+        origin: req.headers.origin,
+        'user-agent': req.headers['user-agent'],
+        authorization: req.headers.authorization ? 'Bearer ***' : 'none',
+      });
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    }
+    next();
+  });
+  
   app.setGlobalPrefix('api');
   app.useGlobalPipes(
     new ValidationPipe({

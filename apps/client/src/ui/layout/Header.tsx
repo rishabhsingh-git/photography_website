@@ -25,45 +25,25 @@ export const Header: React.FC = () => {
   };
 
   const AuthArea: React.FC = () => {
-    const { isAdmin, logout } = useAuth();
+    const { isAdmin } = useAuth();
+    // Only show Admin link for admins, no logout button for end users
     if (isAdmin) {
       return (
-        <>
-          <NavLink
-            to="/admin/dashboard"
-            className={({ isActive }) =>
-              [
-                "px-3 py-1.5 rounded-full border border-slate-700 transition-colors text-sm font-medium",
-                isActive ? "bg-slate-800 text-slate-50" : "text-slate-50 bg-transparent hover:bg-slate-900",
-              ].join(" ")
-            }
-          >
-            Admin
-          </NavLink>
-          <button
-            onClick={async () => {
-              await logout();
-              navigate("/", { replace: true });
-            }}
-            className="rounded-full border border-slate-700 px-4 py-1.5 text-xs font-medium text-slate-50 hover:border-slate-500 hover:bg-slate-900 transition-colors"
-          >
-            Logout
-          </button>
-        </>
+        <NavLink
+          to="/admin/dashboard"
+          className={({ isActive }) =>
+            [
+              "px-3 py-1.5 rounded-full border border-slate-700 transition-colors text-sm font-medium",
+              isActive ? "bg-slate-800 text-slate-50" : "text-slate-50 bg-transparent hover:bg-slate-900",
+            ].join(" ")
+          }
+        >
+          Admin
+        </NavLink>
       );
     }
-    // Non-admin authenticated users see a Logout button only
-    return (
-      <button
-        onClick={async () => {
-          await logout();
-          navigate("/", { replace: true });
-        }}
-        className="rounded-full border border-slate-700 px-4 py-1.5 text-xs font-medium text-slate-50 hover:border-slate-500 hover:bg-slate-900 transition-colors"
-      >
-        Logout
-      </button>
-    );
+    // Non-admin authenticated users - no logout button (only login button for guests)
+    return null;
   };
 
   return (
@@ -187,16 +167,7 @@ export const Header: React.FC = () => {
                     Admin
                   </NavLink>
                 ) : null}
-                <button
-                  onClick={async () => {
-                    close();
-                    await useAuth().logout();
-                    navigate("/");
-                  }}
-                  className="mt-2 w-full rounded-full border border-slate-700 px-4 py-2 text-xs font-medium text-slate-50 hover:border-slate-500 hover:bg-slate-900 transition-colors"
-                >
-                  Logout
-                </button>
+                {/* No logout button for end users */}
               </>
             )}
           </div>

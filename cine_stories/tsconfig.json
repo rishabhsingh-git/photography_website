@@ -16,7 +16,7 @@
     "paths": {
       "*": ["src/*"]
     },
-    "types": ["node", "multer"],
+    "types": ["node", "multer", "cookie-parser", "pdfkit"],
     "esModuleInterop": true
   },
   "include": ["src/**/*"],

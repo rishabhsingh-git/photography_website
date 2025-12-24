@@ -4,6 +4,7 @@ import { BaseEntity } from './base.entity';
 import { User } from './user.entity';
 import { Category } from './category.entity';
 import { Tag } from './tag.entity';
+import { Service } from './service.entity';
 
 @Entity({ name: 'photos' })
 @Index('idx_photo_title', ['title'])
@@ -33,6 +34,12 @@ export class Photo extends BaseEntity {
 
   @ManyToOne(() => Category, (category) => category.photos, { eager: false, nullable: true })
   category?: Category | null;
+
+  @ManyToOne(() => Service, { eager: false, nullable: true })
+  service?: Service | null;
+
+  @Column({ nullable: true })
+  serviceId?: string | null;
 
   @ManyToMany(() => Tag, (tag) => tag.photos, { cascade: true })
   @JoinTable()

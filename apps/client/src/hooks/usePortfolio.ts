@@ -2,12 +2,14 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
 import { Asset } from "../types";
 
-export function usePortfolio(categoryId?: string) {
+export function usePortfolio(categoryId?: string, serviceId?: string) {
   return useQuery({
-    queryKey: ["portfolio", categoryId],
+    queryKey: ["portfolio", categoryId, serviceId],
     initialData: [] as Asset[],
     queryFn: async () => {
-      const params = categoryId ? { categoryId } : undefined;
+      const params: any = {};
+      if (categoryId) params.categoryId = categoryId;
+      if (serviceId) params.serviceId = serviceId;
       const res = await api.get("/assets", { params });
       const payload = res.data;
       if (Array.isArray(payload)) return payload as Asset[];

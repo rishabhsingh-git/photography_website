@@ -1,82 +1,367 @@
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import { useAssets } from "../../hooks/useAssets";
-import { useCategories } from "../../hooks/useCategories";
-import { Card, CardContent } from "../../ui/primitives/Card";
+import { useAdminServices } from "../../hooks/useAdminServices";
+import { Card, CardContent, CardHeader } from "../../ui/primitives/Card";
 import { Button } from "../../ui/primitives/Button";
 import { Select } from "../../ui/primitives/Select";
 import { Skeleton } from "../../ui/skeletons/Skeleton";
 import { useToastStore } from "../../ui/primitives/ToastStore";
+import { Badge } from "../../ui/primitives/Badge";
+import { Tabs, TabList, Tab, TabPanels, TabPanel } from "../../ui/primitives/Tabs";
 
 const AdminAssetsPage: React.FC = () => {
-  const [categoryId, setCategoryId] = useState<string | undefined>(undefined);
-  const { categoriesQuery } = useCategories();
-  const { assetsQuery, upload } = useAssets(categoryId);
+  const [selectedService, setSelectedService] = useState<string | undefined>(undefined);
+  const [activeTabIndex, setActiveTabIndex] = useState<number>(0);
+  const { servicesQuery } = useAdminServices();
+  // Get all services (active and inactive) for admin
+  const allServices = Array.isArray(servicesQuery?.data) ? servicesQuery.data : [];
+  const activeServices = allServices.filter(s => s.isActive);
+  // Determine which service is active based on tab index (0 = all, 1+ = service index)
+  const activeServiceId = activeTabIndex > 0 ? activeServices[activeTabIndex - 1]?.id : undefined;
+  // Fetch all assets for "All Assets" tab, filter by service only when viewing specific service tab
+  const { assetsQuery, upload, uploadMultiple } = useAssets(undefined, activeServiceId);
   const { add } = useToastStore();
-  // Ensure categories is always an array
-  const categories = Array.isArray(categoriesQuery.data) ? categoriesQuery.data : [];
-  // Ensure assets is always an array
+  const services = allServices;
   const assets = Array.isArray(assetsQuery.data) ? assetsQuery.data : [];
   const inputRef = useRef<HTMLInputElement | null>(null);
 
+  // Log services query state and force refetch if needed
+  useEffect(() => {
+    console.log('🔍 [AdminAssetsPage] Services Query State:', {
+      isLoading: servicesQuery.isLoading,
+      isFetching: servicesQuery.isFetching,
+      isError: servicesQuery.isError,
+      error: servicesQuery.error,
+      data: servicesQuery.data,
+      dataLength: allServices.length,
+      activeServicesCount: activeServices.length,
+    });
+    
+    // Force refetch on mount to ensure services are loaded
+    if (!servicesQuery.isFetching && allServices.length === 0 && !servicesQuery.isError) {
+      console.log('🔄 [AdminAssetsPage] Triggering services refetch on mount...');
+      servicesQuery.refetch().catch(err => {
+        console.error('❌ [AdminAssetsPage] Services refetch error:', err);
+      });
+    }
+  }, [servicesQuery.isLoading, servicesQuery.isFetching, servicesQuery.isError, servicesQuery.data, allServices.length, activeServices.length]);
+
+  // Auto-select first service if none selected and services are available
+  useEffect(() => {
+    if (!selectedService && activeServices.length > 0) {
+      console.log('🎯 [AdminAssetsPage] Auto-selecting first service:', activeServices[0].id);
+      setSelectedService(activeServices[0].id);
+    }
+  }, [selectedService, activeServices]);
+
+  // Group assets by service (for "All Assets" tab)
+  const assetsByService = services.reduce((acc, service) => {
+    const serviceAssets = assets.filter((asset: any) => asset.serviceId === service.id);
+    acc[service.id] = {
+      service,
+      assets: serviceAssets,
+    };
+    return acc;
+  }, {} as Record<string, { service: any; assets: any[] }>);
+
   const onUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const formData = new FormData();
-    formData.append("file", file);
-    if (categoryId) formData.append("categoryId", categoryId);
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    if (!selectedService) {
+      add({ title: "Please select a service first", kind: "error" });
+      if (inputRef.current) inputRef.current.value = "";
+      return;
+    }
+
+    // Use multiple file upload endpoint if multiple files
+    if (files.length > 1) {
+      const formData = new FormData();
+      Array.from(files).forEach((file) => {
+        formData.append("files", file);
+      });
+      if (selectedService) formData.append("serviceId", selectedService);
+      
+      try {
+        const result = await uploadMultiple.mutateAsync(formData);
+        console.log('✅ [AdminAssetsPage] Upload result:', result);
+        add({ title: `Uploaded ${files.length} file(s) to service`, kind: "success" });
+        // Invalidate all asset queries to refresh the display
+        assetsQuery.refetch();
+        // Also invalidate portfolio queries
+        setTimeout(() => {
+          assetsQuery.refetch();
+        }, 500);
+      } catch (err: any) {
+        console.error('❌ [AdminAssetsPage] Upload error:', err);
+        add({ title: "Upload failed", description: err?.message, kind: "error" });
+      } finally {
+        if (inputRef.current) inputRef.current.value = "";
+      }
+      return;
+    }
+
+    // Single file upload
+    const uploadPromises = Array.from(files).map(async (file) => {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("title", file.name);
+      if (selectedService) {
+        formData.append("serviceId", selectedService);
+        console.log('📤 [AdminAssetsPage] Uploading with serviceId:', selectedService);
+      }
+      return upload.mutateAsync(formData);
+    });
+
     try {
-      await upload.mutateAsync(formData);
-      add({ title: "Uploaded", kind: "success" });
+      const results = await Promise.all(uploadPromises);
+      console.log('✅ [AdminAssetsPage] Upload results:', results);
+      add({ title: `Uploaded ${files.length} file(s) to service`, kind: "success" });
+      // Invalidate all asset queries to refresh the display
+      assetsQuery.refetch();
+      setTimeout(() => {
+        assetsQuery.refetch();
+      }, 500);
     } catch (err: any) {
+      console.error('❌ [AdminAssetsPage] Upload error:', err);
       add({ title: "Upload failed", description: err?.message, kind: "error" });
     } finally {
       if (inputRef.current) inputRef.current.value = "";
     }
   };
 
+  const isVideoFile = (url: string) => {
+    return /\.(mp4|webm|ogg)$/i.test(url) || url.includes('video');
+  };
+
+  const allAssetsCount = activeTabIndex === 0 ? assets.length : assets.length; // When viewing all, show all; when viewing service, assets are already filtered
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <h1 className="text-xl font-semibold">Assets</h1>
-        <div className="flex items-center gap-2">
-          <Select
-            value={categoryId ?? ""}
-            onChange={(e) => setCategoryId(e.target.value || undefined)}
-            className="w-52"
-          >
-            <option value="">All categories</option>
-            {categories.map((cat) => (
-              <option key={cat.id} value={cat.id}>
-                {cat.name}
+        <div>
+          <h1 className="text-2xl font-semibold text-slate-50">Assets</h1>
+          <p className="text-slate-400 text-sm mt-1">Upload and manage photos by service</p>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="relative w-64">
+            <Select
+              value={selectedService ?? ""}
+              onChange={(e) => setSelectedService(e.target.value || undefined)}
+              className="w-full"
+              disabled={servicesQuery.isLoading}
+            >
+              <option value="">
+                {servicesQuery.isLoading ? "Loading services..." : "Select Service (Required)"}
               </option>
-            ))}
-          </Select>
-          <input ref={inputRef} type="file" className="hidden" onChange={onUpload} />
-          <Button onClick={() => inputRef.current?.click()} loading={upload.isPending}>
-            Upload
+              {allServices.map((service) => (
+                <option key={service.id} value={service.id}>
+                  {service.icon} {service.title} {service.isActive ? "" : "(Inactive)"}
+                </option>
+              ))}
+            </Select>
+            {servicesQuery.isError && (
+              <p className="text-xs text-red-400 mt-1">
+                Error loading services. Please refresh.
+              </p>
+            )}
+            {!servicesQuery.isLoading && !servicesQuery.isError && allServices.length === 0 && (
+              <p className="text-xs text-yellow-400 mt-1">
+                No services found. Create a service first.
+              </p>
+            )}
+          </div>
+          <input 
+            ref={inputRef} 
+            type="file" 
+            className="hidden" 
+            onChange={onUpload} 
+            accept="image/*,video/*" 
+            multiple
+          />
+          <Button 
+            onClick={() => {
+              if (!selectedService) {
+                add({ title: "Please select a service first", kind: "error" });
+                return;
+              }
+              inputRef.current?.click();
+            }} 
+            loading={upload.isPending || uploadMultiple.isPending}
+            disabled={!selectedService}
+          >
+            Upload Assets
           </Button>
         </div>
       </div>
 
-      {assetsQuery.isLoading && <Skeleton className="h-64 w-full" />}
-
-      {!assetsQuery.isLoading && (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-          {assets.map((asset) => (
-            <Card key={asset.id} className="overflow-hidden">
-              <img src={asset.url} alt={asset.title ?? "Asset"} className="h-40 w-full object-cover" />
-              <CardContent className="text-xs text-slate-300">
-                <p className="font-semibold text-sm text-slate-100 truncate">{asset.title ?? "Asset"}</p>
-                <p className="truncate">{asset.tags?.join(", ")}</p>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
+      {/* Service-based Tabs View */}
+      <Card>
+        <CardContent className="p-0">
+          {assetsQuery.isLoading && <Skeleton className="h-64 w-full" />}
+          {!assetsQuery.isLoading && (
+            <Tabs value={activeTabIndex} onChange={setActiveTabIndex}>
+              <TabList className="border-b border-slate-800 px-4 overflow-x-auto">
+                <Tab>
+                  All Assets ({allAssetsCount})
+                </Tab>
+                {activeServices.map((service) => {
+                  const serviceAssets = assetsByService[service.id]?.assets || [];
+                  return (
+                    <Tab key={service.id}>
+                      <div className="flex items-center gap-2">
+                        {service.icon && <span className="text-lg">{service.icon}</span>}
+                        <span>{service.title}</span>
+                        <Badge variant="muted" className="text-xs">
+                          {serviceAssets.length}
+                        </Badge>
+                      </div>
+                    </Tab>
+                  );
+                })}
+              </TabList>
+              <TabPanels>
+                <TabPanel>
+                  <div className="p-4 md:p-6">
+                    {assets.length === 0 ? (
+                      <div className="text-center py-16">
+                        <div className="text-6xl mb-4">📸</div>
+                        <p className="text-slate-400 text-lg">No assets found</p>
+                        <p className="text-slate-500 text-sm mt-2">Select a service and upload your first asset!</p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4">
+                        {assets.map((asset) => (
+                          <Card key={asset.id} className="overflow-hidden group hover:border-slate-700 transition-colors">
+                            <div className="relative aspect-square overflow-hidden bg-slate-900">
+                              {isVideoFile(asset.url) ? (
+                                <video
+                                  src={asset.url}
+                                  className="h-full w-full object-cover"
+                                  controls
+                                  muted
+                                />
+                              ) : (
+                                <img 
+                                  src={asset.url} 
+                                  alt={asset.title ?? "Asset"} 
+                                  className="h-full w-full object-cover group-hover:scale-110 transition-transform duration-300"
+                                  loading="lazy"
+                                />
+                              )}
+                              {asset.service && (
+                                <div className="absolute top-2 left-2">
+                                  <Badge variant="default" className="text-xs">
+                                    {asset.service.icon} {asset.service.title}
+                                  </Badge>
+                                </div>
+                              )}
+                            </div>
+                            <CardContent className="p-2 md:p-3">
+                              <p className="font-medium text-xs md:text-sm text-slate-100 truncate">
+                                {asset.title ?? "Untitled"}
+                              </p>
+                              {asset.service && (
+                                <p className="text-xs text-slate-500 truncate mt-1">
+                                  {asset.service.title}
+                                </p>
+                              )}
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </TabPanel>
+                {activeServices.map((service) => {
+                  // When viewing this service tab, assets are already filtered by serviceId via useAssets hook
+                  // When viewing "All Assets" tab, we use grouped assets
+                  const serviceAssets = activeTabIndex === 0 
+                    ? assetsByService[service.id]?.assets || []
+                    : assets; // Assets are already filtered when viewing service tab
+                  
+                  return (
+                    <TabPanel key={service.id}>
+                      <div className="p-4 md:p-6">
+                        <div className="mb-6 flex items-center justify-between flex-wrap gap-4">
+                          <div>
+                            <div className="flex items-center gap-3">
+                              {service.icon && <span className="text-3xl">{service.icon}</span>}
+                              <div>
+                                <h3 className="text-xl font-semibold text-slate-50">{service.title}</h3>
+                                <p className="text-sm text-slate-400">{serviceAssets.length} assets</p>
+                              </div>
+                            </div>
+                            {service.description && (
+                              <p className="text-sm text-slate-500 mt-2 max-w-2xl">{service.description}</p>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button 
+                              size="sm"
+                              onClick={() => {
+                                setSelectedService(service.id);
+                                setTimeout(() => inputRef.current?.click(), 100);
+                              }} 
+                              loading={upload.isPending || uploadMultiple.isPending}
+                            >
+                              Upload to {service.title}
+                            </Button>
+                          </div>
+                        </div>
+                        {serviceAssets.length === 0 ? (
+                          <div className="text-center py-16 border-2 border-dashed border-slate-800 rounded-xl">
+                            <div className="text-5xl mb-4">📷</div>
+                            <p className="text-slate-400">No assets for this service yet</p>
+                            <p className="text-slate-500 text-sm mt-2">Click "Upload" to add photos</p>
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4">
+                            {serviceAssets.map((asset) => (
+                              <Card key={asset.id} className="overflow-hidden group hover:border-slate-700 transition-all cursor-pointer">
+                                <div className="relative aspect-square overflow-hidden bg-slate-900">
+                                  {isVideoFile(asset.url) ? (
+                                    <video
+                                      src={asset.url}
+                                      className="h-full w-full object-cover"
+                                      controls
+                                      muted
+                                    />
+                                  ) : (
+                                    <img 
+                                      src={asset.url} 
+                                      alt={asset.title ?? "Asset"} 
+                                      className="h-full w-full object-cover group-hover:scale-110 transition-transform duration-300"
+                                      loading="lazy"
+                                    />
+                                  )}
+                                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                                </div>
+                                <CardContent className="p-2 md:p-3">
+                                  <p className="font-medium text-xs md:text-sm text-slate-100 truncate">
+                                    {asset.title ?? "Untitled"}
+                                  </p>
+                                  {asset.tags && asset.tags.length > 0 && (
+                                    <p className="text-xs text-slate-500 truncate mt-1">
+                                      {asset.tags.slice(0, 2).join(", ")}
+                                    </p>
+                                  )}
+                                </CardContent>
+                              </Card>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </TabPanel>
+                  );
+                })}
+              </TabPanels>
+            </Tabs>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 };
 
 export default AdminAssetsPage;
-
-

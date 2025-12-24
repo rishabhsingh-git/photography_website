@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 
 import { StorageService } from './storage.service';
-import { S3Adapter } from './storage.providers';
+import { S3Adapter, OracleAdapter } from './storage.providers';
 
 @Module({
   imports: [ConfigModule],
@@ -10,7 +10,16 @@ import { S3Adapter } from './storage.providers';
     StorageService,
     {
       provide: 'StorageAdapter',
-      useClass: S3Adapter,
+      useFactory: () => {
+        const provider = process.env.STORAGE_PROVIDER || 's3';
+        switch (provider.toLowerCase()) {
+          case 'oracle':
+            return new OracleAdapter();
+          case 's3':
+          default:
+            return new S3Adapter();
+        }
+      },
     },
   ],
   exports: [StorageService],

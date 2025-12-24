@@ -24,4 +24,14 @@ export const useToastStore = create<ToastState>((set) => ({
   remove: (id) => set((state) => ({ toasts: state.toasts.filter((t) => t.id !== id) })),
 }));
 
+// Convenience helper for showing a toast from non-React code (e.g., global error handlers)
+export const addToast = (toast: Omit<ToastMessage, "id">) => {
+  try {
+    useToastStore.getState().add(toast);
+  } catch (err) {
+    // if toast system isn't ready, fall back to console
+    console.warn('⚠️ [addToast] Unable to show toast, falling back to console:', err, toast);
+  }
+};
+
 

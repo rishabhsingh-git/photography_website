@@ -39,7 +39,9 @@ export default defineConfig({
       jsx: 'automatic'
     },
     // Skip lockfile-based optimization to avoid I/O errors
-    holdUntilCrawlEnd: false
+    holdUntilCrawlEnd: false,
+    // Force re-optimization to avoid stale cache - ensures changes reflect immediately
+    force: true
   },
   build: {
     // Memory-saving build options
@@ -59,9 +61,34 @@ export default defineConfig({
   server: {
     host: '0.0.0.0',
     port: 5173,
+    strictPort: true,
+    // Proxy API requests to backend
+    // In Docker, the backend is accessible via service name 'api'
+    // Locally, it's accessible via 'localhost'
+    proxy: {
+      '/api': {
+        target: process.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:3000',
+        changeOrigin: true,
+        secure: false,
+        ws: true,
+        rewrite: (path) => path, // Don't rewrite, keep /api prefix
+        configure: (proxy, _options) => {
+          proxy.on('error', (err, _req, _res) => {
+            console.log('🔴 [Vite Proxy] Error:', err);
+          });
+          proxy.on('proxyReq', (proxyReq, req, _res) => {
+            console.log('🔄 [Vite Proxy] Proxying:', req.method, req.url, '→', proxyReq.path);
+          });
+        },
+      },
+    },
     hmr: {
       port: 5173,
-      host: 'localhost'
+      host: 'localhost',
+      protocol: 'ws',
+      clientPort: 5173,
+      // Improve HMR stability in Docker
+      overlay: true
     },
     fs: {
       allow: [path.resolve(__dirname)]
@@ -80,6 +107,12 @@ export default defineConfig({
         '**/*.log',
         '**/package-lock.json' // Ignore lockfile to avoid I/O errors
       ]
+    },
+    // Disable caching in development - force browser to always fetch fresh files
+    headers: {
+      'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+      'Pragma': 'no-cache',
+      'Expires': '0'
     }
   },
   // Disable features that require file system access to lockfiles

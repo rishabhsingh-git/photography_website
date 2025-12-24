@@ -1,17 +1,48 @@
 import React, { useState } from "react";
 import { useAdminServices } from "../../hooks/useAdminServices";
-import { Card, CardContent } from "../../ui/primitives/Card";
+import { Card, CardContent, CardHeader } from "../../ui/primitives/Card";
 import { Input } from "../../ui/primitives/Input";
 import { Button } from "../../ui/primitives/Button";
+import { Table, THead, TBody, TR, TH, TD } from "../../ui/primitives/Table";
 import { Skeleton } from "../../ui/skeletons/Skeleton";
 import { useToastStore } from "../../ui/primitives/ToastStore";
+import { Badge } from "../../ui/primitives/Badge";
 
 const AdminServicesPage: React.FC = () => {
   const { servicesQuery, createService, updateService, deleteService } = useAdminServices();
   const { add } = useToastStore();
-  // Ensure services is always an array
-  const services = Array.isArray(servicesQuery?.data) ? servicesQuery?.data : [];
+  const services = Array.isArray(servicesQuery?.data) ? servicesQuery.data : [];
+
+  // Log for debugging and force refetch on mount
+  React.useEffect(() => {
+    console.log('🔍 [AdminServicesPage] Query State:', {
+      isLoading: servicesQuery.isLoading,
+      isFetching: servicesQuery.isFetching,
+      isError: servicesQuery.isError,
+      error: servicesQuery.error,
+      data: servicesQuery.data,
+      dataLength: Array.isArray(servicesQuery.data) ? servicesQuery.data.length : 0,
+      status: servicesQuery.status,
+      fetchStatus: servicesQuery.fetchStatus,
+    });
+    
+    if (servicesQuery.isError) {
+      console.error('❌ [AdminServicesPage] Services query error:', servicesQuery.error);
+    }
+    if (servicesQuery.data) {
+      console.log('✅ [AdminServicesPage] Services loaded:', services.length);
+    }
+    
+    // Force refetch on mount to ensure data is loaded
+    if (!servicesQuery.isFetching && !servicesQuery.data) {
+      console.log('🔄 [AdminServicesPage] Triggering refetch on mount...');
+      servicesQuery.refetch().catch(err => {
+        console.error('❌ [AdminServicesPage] Refetch error:', err);
+      });
+    }
+  }, [servicesQuery.isError, servicesQuery.error, servicesQuery.data, services.length, servicesQuery.isLoading, servicesQuery.isFetching, servicesQuery.status, servicesQuery.fetchStatus]);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({
     title: "",
     slogan: "",
@@ -37,6 +68,7 @@ const AdminServicesPage: React.FC = () => {
       icon: "",
     });
     setEditingId(null);
+    setShowForm(false);
   };
 
   const startEdit = (service: any) => {
@@ -52,6 +84,7 @@ const AdminServicesPage: React.FC = () => {
       icon: service.icon || "",
     });
     setEditingId(service.id);
+    setShowForm(true);
   };
 
   const submit = async (e: React.FormEvent) => {
@@ -102,166 +135,191 @@ const AdminServicesPage: React.FC = () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-xl font-semibold">Services</h1>
-          <p className="text-sm text-slate-400">Manage photography services</p>
+          <h1 className="text-2xl font-semibold text-slate-50">Services</h1>
+          <p className="text-slate-400 text-sm mt-1">Manage photography services</p>
         </div>
+        <Button onClick={() => setShowForm(true)}>+ Create Service</Button>
       </div>
 
-      <Card>
-        <CardContent className="p-6">
-          <form onSubmit={submit} className="space-y-4">
-            <div className="grid md:grid-cols-2 gap-4">
-              <Input
-                placeholder="Service Title *"
-                value={form.title}
-                onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-                required
-              />
-              <Input
-                placeholder="Slogan"
-                value={form.slogan}
-                onChange={(e) => setForm((f) => ({ ...f, slogan: e.target.value }))}
-              />
-              <div className="md:col-span-2">
-                <textarea
-                  placeholder="Description"
-                  value={form.description}
-                  onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-                  className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-slate-50 text-sm focus:outline-none focus:ring-2 focus:ring-slate-700"
-                  rows={3}
+      {showForm && (
+        <Card>
+          <CardHeader className="font-semibold">
+            {editingId ? "Edit Service" : "Create New Service"}
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={submit} className="space-y-4">
+              <div className="grid md:grid-cols-2 gap-4">
+                <Input
+                  placeholder="Service Title *"
+                  value={form.title}
+                  onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+                  required
+                />
+                <Input
+                  placeholder="Slogan"
+                  value={form.slogan}
+                  onChange={(e) => setForm((f) => ({ ...f, slogan: e.target.value }))}
+                />
+                <div className="md:col-span-2">
+                  <textarea
+                    placeholder="Description"
+                    value={form.description}
+                    onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+                    className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-slate-50 text-sm focus:outline-none focus:ring-2 focus:ring-slate-700"
+                    rows={3}
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <textarea
+                    placeholder="Highlights (one per line)"
+                    value={form.highlights}
+                    onChange={(e) => setForm((f) => ({ ...f, highlights: e.target.value }))}
+                    className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-slate-50 text-sm focus:outline-none focus:ring-2 focus:ring-slate-700"
+                    rows={3}
+                  />
+                </div>
+                <Input
+                  type="number"
+                  step="0.01"
+                  placeholder="Price *"
+                  value={form.price}
+                  onChange={(e) => setForm((f) => ({ ...f, price: e.target.value }))}
+                  required
+                />
+                <Input
+                  type="number"
+                  step="0.01"
+                  placeholder="Discounted Price"
+                  value={form.discountedPrice}
+                  onChange={(e) => setForm((f) => ({ ...f, discountedPrice: e.target.value }))}
+                />
+                <Input
+                  placeholder="Image URL"
+                  value={form.imageUrl}
+                  onChange={(e) => setForm((f) => ({ ...f, imageUrl: e.target.value }))}
+                />
+                <Input
+                  placeholder="Icon (emoji)"
+                  value={form.icon}
+                  onChange={(e) => setForm((f) => ({ ...f, icon: e.target.value }))}
                 />
               </div>
-              <div className="md:col-span-2">
-                <textarea
-                  placeholder="Highlights (one per line)"
-                  value={form.highlights}
-                  onChange={(e) => setForm((f) => ({ ...f, highlights: e.target.value }))}
-                  className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-slate-50 text-sm focus:outline-none focus:ring-2 focus:ring-slate-700"
-                  rows={3}
-                />
+              <div className="flex items-center gap-3">
+                <label className="flex items-center gap-2 text-sm text-slate-300">
+                  <input
+                    type="checkbox"
+                    checked={form.isActive}
+                    onChange={(e) => setForm((f) => ({ ...f, isActive: e.target.checked }))}
+                    className="h-4 w-4 rounded border-slate-700 bg-slate-900"
+                  />
+                  Active
+                </label>
               </div>
-              <Input
-                type="number"
-                step="0.01"
-                placeholder="Price *"
-                value={form.price}
-                onChange={(e) => setForm((f) => ({ ...f, price: e.target.value }))}
-                required
-              />
-              <Input
-                type="number"
-                step="0.01"
-                placeholder="Discounted Price"
-                value={form.discountedPrice}
-                onChange={(e) => setForm((f) => ({ ...f, discountedPrice: e.target.value }))}
-              />
-              <Input
-                placeholder="Image URL"
-                value={form.imageUrl}
-                onChange={(e) => setForm((f) => ({ ...f, imageUrl: e.target.value }))}
-              />
-              <Input
-                placeholder="Icon (emoji)"
-                value={form.icon}
-                onChange={(e) => setForm((f) => ({ ...f, icon: e.target.value }))}
-              />
-            </div>
-            <div className="flex items-center gap-3">
-              <label className="flex items-center gap-2 text-sm text-slate-300">
-                <input
-                  type="checkbox"
-                  checked={form.isActive}
-                  onChange={(e) => setForm((f) => ({ ...f, isActive: e.target.checked }))}
-                  className="h-4 w-4 rounded border-slate-700 bg-slate-900"
-                />
-                Active
-              </label>
-            </div>
-            <div className="flex gap-2">
-              <Button type="submit" loading={createService.isPending || updateService.isPending}>
-                {editingId ? "Update Service" : "Create Service"}
-              </Button>
-              {editingId && (
+              <div className="flex gap-2">
+                <Button type="submit" loading={createService.isPending || updateService.isPending}>
+                  {editingId ? "Update Service" : "Create Service"}
+                </Button>
                 <Button type="button" variant="secondary" onClick={resetForm}>
                   Cancel
                 </Button>
-              )}
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+      )}
+
+      <Card>
+        <CardContent className="p-0">
+          {servicesQuery.isLoading && (
+            <div className="p-6">
+              <Skeleton className="h-64 w-full" />
+              <p className="text-center text-slate-400 text-sm mt-4">Loading services...</p>
             </div>
-          </form>
+          )}
+          {servicesQuery.isError && (
+            <div className="text-center py-10">
+              <p className="text-red-400 font-semibold">Error loading services</p>
+              <p className="text-slate-500 text-sm mt-2">
+                {(servicesQuery.error as any)?.response?.data?.message || 
+                 (servicesQuery.error as any)?.message || 
+                 "Unknown error. Please check your connection and try again."}
+              </p>
+              <Button 
+                variant="secondary" 
+                size="sm" 
+                className="mt-4"
+                onClick={() => servicesQuery.refetch()}
+              >
+                Retry
+              </Button>
+            </div>
+          )}
+          {!servicesQuery.isLoading && !servicesQuery.isError && services.length === 0 && (
+            <div className="text-center py-10">
+              <p className="text-slate-400 text-lg">No services found</p>
+              <p className="text-slate-500 text-sm mt-2">Create your first service to get started!</p>
+            </div>
+          )}
+          {!servicesQuery.isLoading && !servicesQuery.isError && services.length > 0 && (
+            <Table>
+              <THead>
+                <TR>
+                  <TH>Icon</TH>
+                  <TH>Title</TH>
+                  <TH>Slogan</TH>
+                  <TH>Price</TH>
+                  <TH>Discounted</TH>
+                  <TH>Status</TH>
+                  <TH>Created</TH>
+                  <TH>Actions</TH>
+                </TR>
+              </THead>
+              <TBody>
+                {services.map((service) => (
+                  <TR key={service.id} className="hover:bg-slate-800/50">
+                    <TD>{service.icon || "—"}</TD>
+                    <TD className="font-semibold">{service.title}</TD>
+                    <TD className="text-slate-400 text-sm">{service.slogan || "—"}</TD>
+                    <TD className="font-semibold">₹{service.price?.toLocaleString("en-IN")}</TD>
+                    <TD className="text-green-400">
+                      {service.discountedPrice ? `₹${service.discountedPrice.toLocaleString("en-IN")}` : "—"}
+                    </TD>
+                    <TD>
+                      <Badge variant={service.isActive ? "success" : "danger"}>
+                        {service.isActive ? "Active" : "Inactive"}
+                      </Badge>
+                    </TD>
+                    <TD className="text-slate-400 text-sm">
+                      {service.createdAt ? new Date(service.createdAt).toLocaleDateString() : "—"}
+                    </TD>
+                    <TD>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => startEdit(service)}
+                        >
+                          Edit
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDelete(service.id)}
+                          loading={deleteService.isPending}
+                        >
+                          Delete
+                        </Button>
+                      </div>
+                    </TD>
+                  </TR>
+                ))}
+              </TBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
-
-      {servicesQuery.isLoading && <Skeleton className="h-64 w-full" />}
-
-      {!servicesQuery.isLoading && (
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {services.map((service) => (
-            <Card key={service.id}>
-              <CardContent className="space-y-3">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      {service.icon && <span className="text-2xl">{service.icon}</span>}
-                      <h3 className="font-semibold text-slate-50">{service.title}</h3>
-                    </div>
-                    {service.slogan && (
-                      <p className="text-xs text-slate-400 italic mt-1">{service.slogan}</p>
-                    )}
-                    {service.description && (
-                      <p className="text-sm text-slate-300 mt-2 line-clamp-2">{service.description}</p>
-                    )}
-                    <div className="mt-2 space-y-1">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-slate-400">Price:</span>
-                        <span className="font-semibold text-slate-50">
-                          ₹{service.price?.toLocaleString("en-IN")}
-                        </span>
-                      </div>
-                      {service.discountedPrice && (
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-slate-400">Discounted:</span>
-                          <span className="font-semibold text-green-400">
-                            ₹{service.discountedPrice.toLocaleString("en-IN")}
-                          </span>
-                        </div>
-                      )}
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-slate-500">Status:</span>
-                        <span
-                          className={service.isActive ? "text-green-400" : "text-red-400"}
-                        >
-                          {service.isActive ? "Active" : "Inactive"}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div className="flex gap-2 pt-2 border-t border-slate-800">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    className="flex-1"
-                    onClick={() => startEdit(service)}
-                  >
-                    Edit
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleDelete(service.id)}
-                    loading={deleteService.isPending}
-                  >
-                    Delete
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
     </div>
   );
 };
 
 export default AdminServicesPage;
-

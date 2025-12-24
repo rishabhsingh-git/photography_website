@@ -14,8 +14,8 @@ export const THead: React.FC<{ children: React.ReactNode }> = ({ children }) => 
   <thead className="bg-slate-900/80 text-xs uppercase text-slate-400">{children}</thead>
 );
 export const TBody: React.FC<{ children: React.ReactNode }> = ({ children }) => <tbody>{children}</tbody>;
-export const TR: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <tr className="border-b border-slate-800 last:border-0 hover:bg-slate-900/50">{children}</tr>
+export const TR: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className }) => (
+  <tr className={clsx("border-b border-slate-800 last:border-0 hover:bg-slate-900/50", className)}>{children}</tr>
 );
 export const TH: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className }) => (
   <th scope="col" className={clsx("px-4 py-3", className)}>

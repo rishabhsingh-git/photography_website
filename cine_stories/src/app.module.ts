@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import type { LogLevel } from 'typeorm';
 import { BullModule } from '@nestjs/bull';
 import { CacheModule } from '@nestjs/cache-manager';
 import { LoggerModule } from 'nestjs-pino';
@@ -18,6 +19,9 @@ import { EventModule } from './modules/event/event.module';
 import { PaymentModule } from './modules/payment/payment.module';
 import { ServiceModule } from './modules/service/service.module';
 import { CartModule } from './modules/cart/cart.module';
+import { AnalyticsModule } from './modules/analytics/analytics.module';
+import { UserModule } from './modules/user/user.module';
+import { CategoryModule } from './modules/category/category.module';
 import { HealthController } from './health.controller';
 
 @Module({
@@ -56,17 +60,47 @@ import { HealthController } from './health.controller';
       },
     }),
     TypeOrmModule.forRootAsync({
-      useFactory: () => ({
-        type: 'postgres',
-        url: process.env.DATABASE_URL,
-        host: process.env.DB_HOST,
-        port: Number(process.env.DB_PORT || 5432),
-        username: process.env.DB_USER,
-        password: process.env.DB_PASS,
-        database: process.env.DB_NAME,
-        autoLoadEntities: true,
-        synchronize: true,
-      }),
+      useFactory: () => {
+        // Use DATABASE_URL if provided, otherwise construct from individual parts
+        // If DB_HOST is explicitly set, use it; otherwise default to localhost for local dev
+        const dbConfig = process.env.DATABASE_URL
+          ? { url: process.env.DATABASE_URL }
+          : {
+              host: process.env.DB_HOST || (process.env.NODE_ENV === 'production' ? 'db' : 'localhost'),
+              port: Number(process.env.DB_PORT || 5432),
+              username: process.env.DB_USER || 'cine_stories',
+              password: process.env.DB_PASS || 'cine_stories',
+              database: process.env.DB_NAME || 'cine_stories',
+            };
+
+        const config = {
+          type: 'postgres' as const,
+          ...dbConfig,
+          autoLoadEntities: true,
+          synchronize: process.env.NODE_ENV !== 'production', // Only sync in dev
+          logging: process.env.NODE_ENV === 'development' ? (['error', 'warn', 'query'] as LogLevel[]) : false,
+          // Connection pool settings to prevent stale connections
+          extra: {
+            max: 20, // Maximum pool size
+            min: 5, // Minimum pool size
+            idleTimeoutMillis: 30000, // Close idle connections after 30s
+            connectionTimeoutMillis: 2000, // Timeout after 2s if connection cannot be established
+            // CRITICAL: Ensure immediate commit
+            statement_timeout: 30000, // 30 second timeout for statements
+          },
+          // Note: Transaction isolation level is set per-transaction, not globally
+          // We use READ COMMITTED in all transaction() calls for immediate visibility
+        };
+
+        console.log('🔌 [TypeORM] Database connection config:', {
+          type: config.type,
+          host: dbConfig.host || 'from DATABASE_URL',
+          database: dbConfig.database || 'from DATABASE_URL',
+          synchronize: config.synchronize,
+        });
+
+        return config;
+      },
     }),
     DatabaseModule,
     StorageModule,
@@ -79,6 +113,9 @@ import { HealthController } from './health.controller';
     PaymentModule,
     ServiceModule,
     CartModule,
+    AnalyticsModule,
+    UserModule,
+    CategoryModule,
   ],
   controllers: [HealthController],
 })

@@ -1,6 +1,7 @@
 // Centralised token storage abstraction so we never touch localStorage directly elsewhere.
 
 const ACCESS_TOKEN_KEY = "cine_stories_access_token";
+const REFRESH_TOKEN_KEY = "cine_stories_refresh_token";
 
 export function getAccessToken(): string | null {
   if (typeof window === "undefined") return null;
@@ -24,4 +25,29 @@ export function setAccessToken(token: string | null): void {
   }
 }
 
+export function getRefreshToken(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.localStorage.getItem(REFRESH_TOKEN_KEY);
+  } catch {
+    return null;
+  }
+}
 
+export function setRefreshToken(token: string | null): void {
+  if (typeof window === "undefined") return;
+  try {
+    if (token) {
+      window.localStorage.setItem(REFRESH_TOKEN_KEY, token);
+    } else {
+      window.localStorage.removeItem(REFRESH_TOKEN_KEY);
+    }
+  } catch {
+    // swallow – storage may be unavailable
+  }
+}
+
+export function clearTokens(): void {
+  setAccessToken(null);
+  setRefreshToken(null);
+}

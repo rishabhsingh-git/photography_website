@@ -29,6 +29,12 @@ export interface Asset {
   title?: string;
   tags?: string[];
   categoryId?: string;
+  serviceId?: string;
+  service?: {
+    id: string;
+    title: string;
+    icon?: string;
+  } | null;
   featured?: boolean;
 }
 
@@ -52,8 +58,14 @@ export interface User {
   id: string;
   email: string;
   name?: string;
+  phone?: string;
+  address?: string;
   roles?: string[];
   createdAt?: string;
+  paymentCount?: number;
+  paidPaymentCount?: number;
+  totalPaidAmount?: number;
+  payments?: Payment[];
 }
 
 export interface NotificationItem {

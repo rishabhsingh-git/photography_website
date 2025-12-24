@@ -40,4 +40,19 @@ export class RazorpayAdapter implements PaymentAdapter {
       .digest('hex');
     return digest === data.signature;
   }
+
+  async refundPayment(params: { paymentId: string; amount?: number; notes?: string }) {
+    const refundParams: any = {};
+    
+    if (params.amount) {
+      refundParams.amount = Math.round(params.amount * 100); // Convert to paise
+    }
+    
+    if (params.notes) {
+      refundParams.notes = params.notes;
+    }
+
+    // Razorpay refund method expects paymentId as first arg and params as second arg
+    return this.client.payments.refund(params.paymentId, refundParams);
+  }
 }

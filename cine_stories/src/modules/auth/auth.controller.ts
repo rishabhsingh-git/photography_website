@@ -62,9 +62,9 @@ export class AuthController {
     };
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(AuthGuard('jwt-refresh'))
   @Post('refresh')
   refresh(@Req() req: any) {
-    return this.auth.login(req.user);
+    return this.auth.refreshToken(req.user.userId || req.user.id);
   }
 }

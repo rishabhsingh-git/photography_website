@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useMemo, useState } from "
 import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
-import { getAccessToken, setAccessToken } from "./tokenStorage";
+import { getAccessToken, setAccessToken, getRefreshToken, setRefreshToken, clearTokens } from "./tokenStorage";
 
 export interface AuthUser {
   id: string;
@@ -62,6 +62,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       console.log('data.accessToken******************************************************************************', data.accessToken);
       setAccessToken(data.accessToken);
+      if (data.refreshToken) {
+        setRefreshToken(data.refreshToken);
+      }
       setUser(data.user);
       await queryClient.invalidateQueries();
       
@@ -89,7 +92,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch {
       // ignore network errors here
     } finally {
-      setAccessToken(null);
+      clearTokens();
       setUser(null);
       await queryClient.clear();
       navigate("/auth/login", { replace: true });
