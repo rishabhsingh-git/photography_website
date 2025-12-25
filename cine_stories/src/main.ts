@@ -75,6 +75,19 @@ async function bootstrap() {
   logger.log(status('JWT secret', process.env.JWT_SECRET), 'Bootstrap');
   logger.log(status('Google OAuth', process.env.GOOGLE_CLIENT_ID), 'Bootstrap');
   logger.log(status('Session secret', process.env.SESSION_SECRET), 'Bootstrap');
+  
+  // Log storage provider configuration
+  const storageProvider = process.env.STORAGE_PROVIDER || 's3';
+  logger.log(`📦 Storage Provider: ${storageProvider}`, 'Bootstrap');
+  if (storageProvider === 'oracle') {
+    logger.log(status('OCI Tenancy', process.env.OCI_TENANCY_OCID), 'Bootstrap');
+    logger.log(status('OCI User', process.env.OCI_USER_OCID), 'Bootstrap');
+    logger.log(status('OCI Fingerprint', process.env.OCI_FINGERPRINT), 'Bootstrap');
+    logger.log(status('OCI Private Key', process.env.OCI_PRIVATE_KEY ? 'set' : 'missing'), 'Bootstrap');
+    logger.log(status('OCI Region', process.env.OCI_REGION), 'Bootstrap');
+    logger.log(status('OCI Namespace', process.env.OCI_NAMESPACE), 'Bootstrap');
+    logger.log(status('OCI Bucket', process.env.OCI_BUCKET_NAME), 'Bootstrap');
+  }
 }
 
 // critical: bootstrap must fail fast for misconfigurations, so we rely on

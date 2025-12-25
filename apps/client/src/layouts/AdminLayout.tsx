@@ -9,7 +9,6 @@ const adminNav = [
   { to: "/admin/users", label: "Clients" },
   { to: "/admin/payments", label: "Payments" },
   { to: "/admin/assets", label: "Assets" },
-  { to: "/admin/categories", label: "Categories" },
   { to: "/admin/services", label: "Services" },
 ];
 

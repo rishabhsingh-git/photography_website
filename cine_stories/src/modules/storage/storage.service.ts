@@ -13,4 +13,8 @@ export class StorageService {
   getSignedUrl(key: string): string {
     return this.adapter.getUrl(key);
   }
+
+  async deleteObject(key: string): Promise<void> {
+    return this.adapter.delete(key);
+  }
 }

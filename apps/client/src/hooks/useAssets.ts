@@ -13,15 +13,29 @@ export function useAssets(categoryId?: string, serviceId?: string) {
       const params: any = {};
       if (categoryId) params.categoryId = categoryId;
       if (serviceId) params.serviceId = serviceId;
+      console.log('🔍 [useAssets] Fetching assets with params:', params);
       const res = await api.get("/assets", { params });
       const payload = res.data;
-      if (Array.isArray(payload)) return payload as Asset[];
-      if (payload && Array.isArray((payload as any).data)) return (payload as any).data as Asset[];
+      console.log('📦 [useAssets] Received payload:', {
+        isArray: Array.isArray(payload),
+        length: Array.isArray(payload) ? payload.length : 'not array',
+        sample: Array.isArray(payload) && payload.length > 0 ? payload[0] : null,
+      });
+      if (Array.isArray(payload)) {
+        console.log('✅ [useAssets] Returning array of', payload.length, 'assets');
+        return payload as Asset[];
+      }
+      if (payload && Array.isArray((payload as any).data)) {
+        console.log('✅ [useAssets] Returning data array of', (payload as any).data.length, 'assets');
+        return (payload as any).data as Asset[];
+      }
       // eslint-disable-next-line no-console
-      console.warn("Unexpected /assets payload:", payload);
+      console.warn("⚠️ [useAssets] Unexpected /assets payload:", payload);
       return [] as Asset[];
     },
-    staleTime: 2 * 60 * 1000,
+    staleTime: 0, // Always fetch fresh data
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
   });
 
   const upload = useMutation({
@@ -44,6 +58,9 @@ export function useAssets(categoryId?: string, serviceId?: string) {
       // Invalidate all asset queries, not just the current one
       queryClient.invalidateQueries({ queryKey: ["assets"] });
       queryClient.invalidateQueries({ queryKey: ["portfolio"] });
+      // Force immediate refetch
+      queryClient.refetchQueries({ queryKey: ["assets"] });
+      queryClient.refetchQueries({ queryKey: ["portfolio"] });
     },
   });
 
@@ -73,6 +90,9 @@ export function useAssets(categoryId?: string, serviceId?: string) {
       // Invalidate all asset queries, not just the current one
       queryClient.invalidateQueries({ queryKey: ["assets"] });
       queryClient.invalidateQueries({ queryKey: ["portfolio"] });
+      // Force immediate refetch
+      queryClient.refetchQueries({ queryKey: ["assets"] });
+      queryClient.refetchQueries({ queryKey: ["portfolio"] });
     },
   });
 
@@ -82,7 +102,23 @@ export function useAssets(categoryId?: string, serviceId?: string) {
     onSuccess: () => queryClient.invalidateQueries({ queryKey }),
   });
 
-  return { assetsQuery, upload, uploadMultiple, update };
+  const deleteAsset = useMutation({
+    mutationFn: (id: string) => {
+      console.log('🗑️ [useAssets] Deleting asset:', id);
+      return api.delete(`/assets/${id}`);
+    },
+    onSuccess: () => {
+      console.log('✅ [useAssets] Delete successful');
+      // Invalidate all asset queries
+      queryClient.invalidateQueries({ queryKey: ["assets"] });
+      queryClient.invalidateQueries({ queryKey: ["portfolio"] });
+      // Force immediate refetch
+      queryClient.refetchQueries({ queryKey: ["assets"] });
+      queryClient.refetchQueries({ queryKey: ["portfolio"] });
+    },
+  });
+
+  return { assetsQuery, upload, uploadMultiple, update, deleteAsset };
 }
 
 

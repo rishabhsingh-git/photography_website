@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Delete,
   UploadedFile,
   UploadedFiles,
   UseGuards,
@@ -46,12 +47,18 @@ export class AssetsController {
 
   @Get()
   async list(@Query('categoryId') categoryId?: string, @Query('serviceId') serviceId?: string) {
-    const result = await this.media.list(undefined, 100, serviceId);
-    let photos = result.data || [];
+    console.log('📥 [AssetsController] GET /assets request:', { categoryId, serviceId });
     
-    if (categoryId) {
-      photos = photos.filter((p: any) => p.category?.id === categoryId);
-    }
+    // Increase limit to 1000 to get all assets (or use pagination later)
+    const result = await this.media.list(undefined, 1000, serviceId, categoryId);
+    const photos = result.data || [];
+    
+    console.log('📤 [AssetsController] Returning assets:', {
+      count: photos.length,
+      serviceId,
+      categoryId,
+      sampleIds: photos.slice(0, 3).map((p: any) => p.id),
+    });
     
     return photos.map((photo: any) => ({
       id: photo.id,
@@ -66,6 +73,21 @@ export class AssetsController {
         icon: photo.service.icon,
       } : null,
     }));
+  }
+
+  @Get('carousel')
+  async getCarousel(@Query('count') count?: string) {
+    console.log('🎠 [AssetsController] GET /assets/carousel request:', { count });
+    
+    const imageCount = count ? parseInt(count, 10) : 6;
+    const images = await this.media.getCarouselImages(imageCount);
+    
+    console.log('✅ [AssetsController] Returning carousel images:', {
+      requested: imageCount,
+      returned: images.length,
+    });
+    
+    return images;
   }
 
   @UseGuards(AdminGuard)
@@ -194,5 +216,26 @@ export class AssetsController {
   async update(@Param('id') id: string, @Body() body: Partial<any>) {
     // Update logic would go here
     return { success: true };
+  }
+
+  @UseGuards(AdminGuard)
+  @Delete(':id')
+  async delete(@Param('id') id: string) {
+    try {
+      console.log('🗑️ [AssetsController] Delete request:', { id });
+      
+      await this.media.delete(id);
+      
+      console.log('✅ [AssetsController] Delete successful:', { id });
+      
+      return { success: true, message: 'Asset deleted successfully' };
+    } catch (error: any) {
+      console.error('❌ [AssetsController] Delete failed:', {
+        error: error.message,
+        stack: error.stack,
+        id,
+      });
+      throw error;
+    }
   }
 }

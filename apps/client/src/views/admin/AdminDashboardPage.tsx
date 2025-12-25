@@ -6,7 +6,6 @@ import { usePayments } from "../../hooks/usePayments";
 import { useFunnelData } from "../../hooks/useAnalytics";
 import { useUsers } from "../../hooks/useUsers";
 import { useAdminServices } from "../../hooks/useAdminServices";
-import { useCategories } from "../../hooks/useCategories";
 import { useAssets } from "../../hooks/useAssets";
 import { api } from "../../api/client";
 import { Skeleton } from "../../ui/skeletons/Skeleton";
@@ -18,7 +17,6 @@ const AdminDashboardPage: React.FC = () => {
   const funnel = useFunnelData();
   const users = useUsers();
   const { servicesQuery } = useAdminServices();
-  const { categoriesQuery } = useCategories();
   const assets = useAssets();
   
   const paymentsList = Array.isArray(payments.data) ? payments.data : [];
@@ -26,7 +24,6 @@ const AdminDashboardPage: React.FC = () => {
   const conversionRates = funnel.data?.conversionRates || {};
   const usersList = Array.isArray(users.data) ? users.data : [];
   const servicesList = Array.isArray(servicesQuery?.data) ? servicesQuery?.data : [];
-  const categoriesList = Array.isArray(categoriesQuery?.data) ? categoriesQuery?.data : [];
   const assetsList = Array.isArray(assets.assetsQuery?.data) ? assets.assetsQuery?.data : [];
 
   // Calculate total revenue from payments
@@ -87,13 +84,7 @@ const AdminDashboardPage: React.FC = () => {
       </div>
 
       {/* Secondary Metrics */}
-      <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="text-sm text-slate-400">Categories</CardHeader>
-          <CardContent className="text-2xl font-semibold">
-            {categoriesList.length}
-          </CardContent>
-        </Card>
+      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
         <Card>
           <CardHeader className="text-sm text-slate-400">Assets</CardHeader>
           <CardContent className="text-2xl font-semibold">

@@ -2,6 +2,7 @@ import React from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../../hooks/useAuth";
 import { useMobileMenuStore } from "../../state/useMobileMenuStore";
+import { Logo } from "./Logo";
 
 const navItems = [
   { to: "/portfolio", label: "Portfolio" },
@@ -49,13 +50,8 @@ export const Header: React.FC = () => {
   return (
     <header className="fixed inset-x-0 top-0 z-40 border-b border-slate-800 bg-slate-950/80 backdrop-blur">
       <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Link to="/" className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-full bg-gradient-to-tr from-pink-500 via-amber-400 to-sky-500 shadow-lg" />
-            <span className="font-semibold tracking-tight text-lg">
-              Cine Stories
-            </span>
-          </Link>
+        <div className="flex items-center gap-3 ml-[10px]">
+          <Logo />
         </div>
         <nav className="hidden md:flex items-center gap-4 text-sm">
           {navItems.map((item) => (

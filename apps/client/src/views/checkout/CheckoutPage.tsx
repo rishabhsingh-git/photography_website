@@ -99,7 +99,7 @@ const CheckoutPage: React.FC = () => {
         key: data.key,
         amount: data.amount,
         currency: data.currency,
-        name: "Cine Stories",
+        name: "Cine Storiees",
         description: "Photography Services",
         order_id: data.orderId,
         prefill: {

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useServices } from "../../hooks/useServices";
 import { usePortfolio } from "../../hooks/usePortfolio";
@@ -12,14 +12,49 @@ const PortfolioPage: React.FC = () => {
   const [params, setParams] = useSearchParams();
   const activeServiceId = params.get("service") ?? undefined;
   const { isMobile } = useResponsive();
+  
+  // Fetch all assets for "All Services" view
+  const allPortfolioQuery = usePortfolio(undefined, undefined);
+  // Fetch filtered assets for specific service view
   const portfolioQuery = usePortfolio(undefined, activeServiceId);
   const [lightbox, setLightbox] = useState<string | null>(null);
 
   const allServices = Array.isArray(servicesQuery?.data) ? servicesQuery?.data : [];
   // Only show active services in the portfolio
   const services = allServices.filter(s => s.isActive);
-  const portfolioData = Array.isArray(portfolioQuery?.data) ? portfolioQuery?.data : [];
   
+  // Use all assets when no service is selected, filtered assets when service is selected
+  const portfolioData = activeServiceId 
+    ? (Array.isArray(portfolioQuery?.data) ? portfolioQuery.data : [])
+    : (Array.isArray(allPortfolioQuery?.data) ? allPortfolioQuery.data : []);
+  
+  // Force refetch on mount and when service filter changes
+  useEffect(() => {
+    console.log('🚀 [PortfolioPage] Component mounted or service changed, activeServiceId:', activeServiceId);
+    if (activeServiceId) {
+      console.log('🔄 [PortfolioPage] Refetching portfolio for service:', activeServiceId);
+      portfolioQuery.refetch().catch(err => {
+        console.error('❌ [PortfolioPage] Service portfolio refetch error:', err);
+      });
+    } else {
+      console.log('🔄 [PortfolioPage] Refetching all portfolio assets...');
+      allPortfolioQuery.refetch().catch(err => {
+        console.error('❌ [PortfolioPage] All portfolio refetch error:', err);
+      });
+    }
+  }, [activeServiceId]);
+
+  // Force refetch on initial mount
+  useEffect(() => {
+    console.log('🚀 [PortfolioPage] Component mounted, forcing initial refetch...');
+    allPortfolioQuery.refetch().catch(err => {
+      console.error('❌ [PortfolioPage] Initial all portfolio refetch error:', err);
+    });
+    portfolioQuery.refetch().catch(err => {
+      console.error('❌ [PortfolioPage] Initial service portfolio refetch error:', err);
+    });
+  }, []); // Only run on mount
+
   console.log('📊 [PortfolioPage] Services:', {
     total: allServices.length,
     active: services.length,
@@ -30,7 +65,19 @@ const PortfolioPage: React.FC = () => {
   console.log('📊 [PortfolioPage] Portfolio data:', {
     count: portfolioData.length,
     activeServiceId,
-    assets: portfolioData.map(a => ({ id: a.id, serviceId: a.serviceId, serviceTitle: a.service?.title })),
+    allPortfolioCount: Array.isArray(allPortfolioQuery?.data) ? allPortfolioQuery.data.length : 0,
+    servicePortfolioCount: Array.isArray(portfolioQuery?.data) ? portfolioQuery.data.length : 0,
+    allPortfolioQueryState: {
+      isLoading: allPortfolioQuery.isLoading,
+      isFetching: allPortfolioQuery.isFetching,
+      isError: allPortfolioQuery.isError,
+    },
+    servicePortfolioQueryState: {
+      isLoading: portfolioQuery.isLoading,
+      isFetching: portfolioQuery.isFetching,
+      isError: portfolioQuery.isError,
+    },
+    assets: portfolioData.slice(0, 3).map(a => ({ id: a.id, serviceId: a.serviceId, serviceTitle: a.service?.title })),
   });
 
   // Group assets by service for better organization
@@ -109,7 +156,7 @@ const PortfolioPage: React.FC = () => {
         </div>
 
         {/* Loading State */}
-        {portfolioQuery.isLoading && (
+        {(portfolioQuery.isLoading || allPortfolioQuery.isLoading) && (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
             {Array.from({ length: 8 }).map((_, i) => (
               <Skeleton key={i} className="aspect-square w-full rounded-xl" />
@@ -118,7 +165,7 @@ const PortfolioPage: React.FC = () => {
         )}
 
         {/* Portfolio Grid */}
-        {!portfolioQuery.isLoading && portfolioData.length === 0 && (
+        {!(portfolioQuery.isLoading || allPortfolioQuery.isLoading) && portfolioData.length === 0 && (
           <div className="text-center py-20">
             <div className="text-6xl mb-4">📸</div>
             <p className="text-slate-400 text-lg">No assets found</p>
@@ -128,7 +175,7 @@ const PortfolioPage: React.FC = () => {
           </div>
         )}
 
-        {!portfolioQuery.isLoading && portfolioData.length > 0 && (
+        {!(portfolioQuery.isLoading || allPortfolioQuery.isLoading) && portfolioData.length > 0 && (
           <div className={`columns-1 ${isMobile ? 'sm:columns-2' : 'md:columns-3 lg:columns-4'} gap-3 md:gap-4 space-y-3 md:space-y-4`}>
             {portfolioData.map((asset, idx) => {
               const isVideo = /\.(mp4|webm|ogg)$/i.test(asset.url) || asset.url.includes('video');
@@ -138,11 +185,11 @@ const PortfolioPage: React.FC = () => {
                   className="group relative w-full rounded-xl border border-slate-800 overflow-hidden cursor-pointer hover:border-slate-700 transition-all break-inside-avoid mb-3 md:mb-4 bg-slate-900/50 backdrop-blur-sm"
                   onClick={() => setLightbox(asset.url)}
                 >
-                  <div className="relative aspect-square overflow-hidden">
+                  <div className="relative w-full">
                     {isVideo ? (
                       <video
                         src={asset.url}
-                        className="w-full h-full object-cover"
+                        className="w-full h-auto object-cover rounded-xl"
                         muted
                         playsInline
                         preload="metadata"
@@ -156,8 +203,13 @@ const PortfolioPage: React.FC = () => {
                       <img
                         src={asset.url}
                         alt={asset.title || "Portfolio"}
-                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                        className="w-full h-auto object-contain rounded-xl group-hover:scale-[1.02] transition-transform duration-500"
                         loading="lazy"
+                        style={{ 
+                          imageRendering: 'auto',
+                          imageRendering: '-webkit-optimize-contrast',
+                        }}
+                        sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                       />
                     )}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/0 to-black/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
@@ -195,7 +247,12 @@ const PortfolioPage: React.FC = () => {
                 <img
                   src={lightbox}
                   alt="Preview"
-                  className="w-full h-[60vh] md:h-[70vh] object-contain rounded-xl"
+                  className="w-full max-h-[80vh] object-contain rounded-xl"
+                  style={{ 
+                    imageRendering: 'auto',
+                    imageRendering: '-webkit-optimize-contrast',
+                  }}
+                  loading="eager"
                 />
               )}
             </div>

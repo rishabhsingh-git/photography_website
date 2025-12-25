@@ -6,8 +6,10 @@ interface Props {
 
 export const DashboardLayout: React.FC<Props> = ({ children }) => {
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8">
-      {children}
+    <div className="w-full">
+      <div className="max-w-7xl mx-auto px-4 md:px-6 lg:px-8">
+        {children}
+      </div>
     </div>
   );
 };

@@ -19,10 +19,29 @@ const AdminAssetsPage: React.FC = () => {
   // Determine which service is active based on tab index (0 = all, 1+ = service index)
   const activeServiceId = activeTabIndex > 0 ? activeServices[activeTabIndex - 1]?.id : undefined;
   // Fetch all assets for "All Assets" tab, filter by service only when viewing specific service tab
-  const { assetsQuery, upload, uploadMultiple } = useAssets(undefined, activeServiceId);
+  const { assetsQuery, upload, uploadMultiple, deleteAsset } = useAssets(undefined, activeServiceId);
   const { add } = useToastStore();
   const services = allServices;
   const assets = Array.isArray(assetsQuery.data) ? assetsQuery.data : [];
+
+  // Debug logging for assets
+  useEffect(() => {
+    console.log('📊 [AdminAssetsPage] Assets Query State:', {
+      isLoading: assetsQuery.isLoading,
+      isFetching: assetsQuery.isFetching,
+      isError: assetsQuery.isError,
+      error: assetsQuery.error,
+      dataLength: assets.length,
+      activeServiceId,
+      activeTabIndex,
+      sampleAssets: assets.slice(0, 3).map((a: any) => ({
+        id: a.id,
+        title: a.title,
+        serviceId: a.serviceId,
+        serviceTitle: a.service?.title,
+      })),
+    });
+  }, [assetsQuery.isLoading, assetsQuery.isFetching, assetsQuery.data, assets.length, activeServiceId, activeTabIndex]);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   // Log services query state and force refetch if needed
@@ -55,14 +74,81 @@ const AdminAssetsPage: React.FC = () => {
   }, [selectedService, activeServices]);
 
   // Group assets by service (for "All Assets" tab)
+  // When viewing "All Assets" tab, we need to fetch ALL assets (not filtered by service)
+  // So we need a separate query for all assets
+  const { assetsQuery: allAssetsQuery } = useAssets(undefined, undefined);
+  
+  // Force refetch all assets when component mounts or when tab changes to "All Assets"
+  useEffect(() => {
+    console.log('🔄 [AdminAssetsPage] Tab changed or component mounted, activeTabIndex:', activeTabIndex);
+    if (activeTabIndex === 0) {
+      console.log('🔄 [AdminAssetsPage] Refetching all assets for "All Assets" tab...');
+      allAssetsQuery.refetch().catch(err => {
+        console.error('❌ [AdminAssetsPage] All assets refetch error:', err);
+      });
+    } else if (activeServiceId) {
+      console.log('🔄 [AdminAssetsPage] Refetching assets for service:', activeServiceId);
+      assetsQuery.refetch().catch(err => {
+        console.error('❌ [AdminAssetsPage] Service assets refetch error:', err);
+      });
+    }
+  }, [activeTabIndex, activeServiceId]);
+
+  // Force refetch on initial mount
+  useEffect(() => {
+    console.log('🚀 [AdminAssetsPage] Component mounted, forcing initial refetch...');
+    allAssetsQuery.refetch().catch(err => {
+      console.error('❌ [AdminAssetsPage] Initial all assets refetch error:', err);
+    });
+    assetsQuery.refetch().catch(err => {
+      console.error('❌ [AdminAssetsPage] Initial service assets refetch error:', err);
+    });
+  }, []); // Only run on mount
+
+  const allAssets = activeTabIndex === 0 
+    ? (Array.isArray(allAssetsQuery.data) ? allAssetsQuery.data : [])
+    : assets;
+
   const assetsByService = services.reduce((acc, service) => {
-    const serviceAssets = assets.filter((asset: any) => asset.serviceId === service.id);
+    const serviceAssets = allAssets.filter((asset: any) => {
+      const matches = asset.serviceId === service.id;
+      return matches;
+    });
     acc[service.id] = {
       service,
       assets: serviceAssets,
     };
     return acc;
   }, {} as Record<string, { service: any; assets: any[] }>);
+
+  // Debug logging for grouping
+  useEffect(() => {
+    console.log('📦 [AdminAssetsPage] Assets state:', {
+      activeTabIndex,
+      allAssetsCount: allAssets.length,
+      assetsCount: assets.length,
+      allAssetsQueryState: {
+        isLoading: allAssetsQuery.isLoading,
+        isFetching: allAssetsQuery.isFetching,
+        isError: allAssetsQuery.isError,
+        error: allAssetsQuery.error,
+        dataLength: Array.isArray(allAssetsQuery.data) ? allAssetsQuery.data.length : 0,
+      },
+      assetsQueryState: {
+        isLoading: assetsQuery.isLoading,
+        isFetching: assetsQuery.isFetching,
+        isError: assetsQuery.isError,
+        error: assetsQuery.error,
+        dataLength: assets.length,
+      },
+      servicesWithAssets: Object.keys(assetsByService).filter(id => assetsByService[id].assets.length > 0),
+      counts: Object.entries(assetsByService).map(([id, data]) => ({
+        serviceId: id,
+        serviceTitle: data.service.title,
+        count: data.assets.length,
+      })),
+    });
+  }, [allAssets.length, assets.length, assetsByService, activeTabIndex, allAssetsQuery.isLoading, allAssetsQuery.isFetching, assetsQuery.isLoading, assetsQuery.isFetching]);
 
   const onUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -88,9 +174,11 @@ const AdminAssetsPage: React.FC = () => {
         add({ title: `Uploaded ${files.length} file(s) to service`, kind: "success" });
         // Invalidate all asset queries to refresh the display
         assetsQuery.refetch();
+        allAssetsQuery.refetch();
         // Also invalidate portfolio queries
         setTimeout(() => {
           assetsQuery.refetch();
+          allAssetsQuery.refetch();
         }, 500);
       } catch (err: any) {
         console.error('❌ [AdminAssetsPage] Upload error:', err);
@@ -119,8 +207,10 @@ const AdminAssetsPage: React.FC = () => {
       add({ title: `Uploaded ${files.length} file(s) to service`, kind: "success" });
       // Invalidate all asset queries to refresh the display
       assetsQuery.refetch();
+      allAssetsQuery.refetch();
       setTimeout(() => {
         assetsQuery.refetch();
+        allAssetsQuery.refetch();
       }, 500);
     } catch (err: any) {
       console.error('❌ [AdminAssetsPage] Upload error:', err);
@@ -134,7 +224,7 @@ const AdminAssetsPage: React.FC = () => {
     return /\.(mp4|webm|ogg)$/i.test(url) || url.includes('video');
   };
 
-  const allAssetsCount = activeTabIndex === 0 ? assets.length : assets.length; // When viewing all, show all; when viewing service, assets are already filtered
+  const allAssetsCount = allAssets.length;
 
   return (
     <div className="space-y-6">
@@ -206,14 +296,16 @@ const AdminAssetsPage: React.FC = () => {
                   All Assets ({allAssetsCount})
                 </Tab>
                 {activeServices.map((service) => {
-                  const serviceAssets = assetsByService[service.id]?.assets || [];
+                  // Always use assetsByService for accurate count (calculated from allAssets)
+                  // This shows the total count for each service regardless of which tab is active
+                  const serviceAssetsCount = assetsByService[service.id]?.assets?.length || 0;
                   return (
                     <Tab key={service.id}>
                       <div className="flex items-center gap-2">
                         {service.icon && <span className="text-lg">{service.icon}</span>}
                         <span>{service.title}</span>
                         <Badge variant="muted" className="text-xs">
-                          {serviceAssets.length}
+                          {serviceAssetsCount}
                         </Badge>
                       </div>
                     </Tab>
@@ -223,7 +315,7 @@ const AdminAssetsPage: React.FC = () => {
               <TabPanels>
                 <TabPanel>
                   <div className="p-4 md:p-6">
-                    {assets.length === 0 ? (
+                    {allAssets.length === 0 ? (
                       <div className="text-center py-16">
                         <div className="text-6xl mb-4">📸</div>
                         <p className="text-slate-400 text-lg">No assets found</p>
@@ -231,7 +323,7 @@ const AdminAssetsPage: React.FC = () => {
                       </div>
                     ) : (
                       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4">
-                        {assets.map((asset) => (
+                        {allAssets.map((asset) => (
                           <Card key={asset.id} className="overflow-hidden group hover:border-slate-700 transition-colors">
                             <div className="relative aspect-square overflow-hidden bg-slate-900">
                               {isVideoFile(asset.url) ? (
@@ -256,6 +348,29 @@ const AdminAssetsPage: React.FC = () => {
                                   </Badge>
                                 </div>
                               )}
+                              <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Button
+                                  size="sm"
+                                  variant="danger"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (confirm(`Are you sure you want to delete "${asset.title ?? "this asset"}"? This will remove it from Oracle storage and the database.`)) {
+                                      deleteAsset.mutate(asset.id, {
+                                        onSuccess: () => {
+                                          add({ title: "Asset deleted successfully", kind: "success" });
+                                        },
+                                        onError: (error: any) => {
+                                          add({ title: `Failed to delete asset: ${error.message || "Unknown error"}`, kind: "error" });
+                                        },
+                                      });
+                                    }
+                                  }}
+                                  loading={deleteAsset.isPending}
+                                  className="h-8 w-8 p-0"
+                                >
+                                  🗑️
+                                </Button>
+                              </div>
                             </div>
                             <CardContent className="p-2 md:p-3">
                               <p className="font-medium text-xs md:text-sm text-slate-100 truncate">
@@ -277,8 +392,8 @@ const AdminAssetsPage: React.FC = () => {
                   // When viewing this service tab, assets are already filtered by serviceId via useAssets hook
                   // When viewing "All Assets" tab, we use grouped assets
                   const serviceAssets = activeTabIndex === 0 
-                    ? assetsByService[service.id]?.assets || []
-                    : assets; // Assets are already filtered when viewing service tab
+                    ? (assetsByService[service.id]?.assets || [])
+                    : (activeServiceId === service.id ? assets : []); // Only show assets for the active service tab
                   
                   return (
                     <TabPanel key={service.id}>
@@ -336,6 +451,29 @@ const AdminAssetsPage: React.FC = () => {
                                     />
                                   )}
                                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                                  <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <Button
+                                      size="sm"
+                                      variant="danger"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (confirm(`Are you sure you want to delete "${asset.title ?? "this asset"}"? This will remove it from Oracle storage and the database.`)) {
+                                          deleteAsset.mutate(asset.id, {
+                                            onSuccess: () => {
+                                              add({ title: "Asset deleted successfully", kind: "success" });
+                                            },
+                                            onError: (error: any) => {
+                                              add({ title: `Failed to delete asset: ${error.message || "Unknown error"}`, kind: "error" });
+                                            },
+                                          });
+                                        }
+                                      }}
+                                      loading={deleteAsset.isPending}
+                                      className="h-8 w-8 p-0"
+                                    >
+                                      🗑️
+                                    </Button>
+                                  </div>
                                 </div>
                                 <CardContent className="p-2 md:p-3">
                                   <p className="font-medium text-xs md:text-sm text-slate-100 truncate">

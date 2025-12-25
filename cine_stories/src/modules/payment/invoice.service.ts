@@ -60,7 +60,7 @@ export class InvoiceService {
     doc.fillColor('#ffffff')
        .fontSize(28)
        .font('Helvetica-Bold')
-       .text('CINE STORIES', margin, 30, { align: 'left' });
+       .text('CINE STORIEES', margin, 30, { align: 'left' });
     
     doc.fillColor('#ffffff')
        .fontSize(12)
@@ -357,8 +357,8 @@ export class InvoiceService {
 
     doc.fillColor(lightColor)
        .fontSize(8)
-       .font('Helvetica')
-       .text('Cine Stories - Professional Photography Services', margin, footerY + 25, { align: 'center', width: contentWidth });
+         .font('Helvetica')
+         .text('Cine Stories - Professional Photography Services', margin, footerY + 25, { align: 'center', width: contentWidth });
 
     doc.fillColor(lightColor)
        .fontSize(8)
